@@ -3,5 +3,144 @@
 @tailwind utilities;
 
 [x-cloak] {
-    display: none;
+  display: none;
+}
+
+/* Declaração das fontes */
+@font-face {
+  font-family: 'Ethnocentric';
+  src: url('../fonts/rcStudio/ethocentrics/ethnocentricRg.otf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Ethnocentric';
+  src: url('../fonts/rcStudio/ethocentrics/ethnocentricRgIt.otf') format('opentype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Bebas Kai';
+  src: url('../fonts/rcStudio/bebas/bebasKai.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Sidebar */
+.sidebar {
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  border-right: 1px solid rgba(55, 65, 81, 0.5);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+  overflow-x: hidden;
+}
+
+.sidebar-link {
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #3b82f6;
+  transform: scaleY(0);
+  transition: transform 0.2s ease;
+}
+
+.sidebar-link.active::before {
+  transform: scaleY(1);
+}
+
+.sidebar-link:hover {
+  background: rgba(55, 65, 81, 0.4);
+}
+
+.sidebar-link.active {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.sidebar-link.active .sidebar-icon {
+  color: #60a5fa;
+}
+
+.sidebar-link.active .sidebar-text {
+  color: #f3f4f6;
+  font-weight: 600;
+}
+
+.sidebar-icon {
+  width: 1.25rem;
+  text-align: center;
+  transition: color 0.2s ease;
+}
+
+.sidebar-action-btn {
+  transition: all 0.2s ease;
+}
+
+.sidebar-action-btn:hover {
+  transform: translateX(2px);
+}
+
+.sidebar-action-btn.event:hover {
+  background: rgba(22, 163, 74, 0.15);
+}
+
+.sidebar-action-btn.event:hover .sidebar-icon {
+  color: #4ade80;
+}
+
+.sidebar-action-btn.team:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.sidebar-action-btn.team:hover .sidebar-icon {
+  color: #60a5fa;
+}
+
+.sidebar-action-btn.logout:hover {
+  background: rgba(220, 38, 38, 0.15);
+}
+
+.sidebar-action-btn.logout:hover .sidebar-icon {
+  color: #f87171;
+}
+
+.sidebar-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(55, 65, 81, 0.5), transparent);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
 }

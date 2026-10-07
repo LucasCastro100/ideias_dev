@@ -1,4 +1,4 @@
----LIMPAR CAHCE---
+--- LIMPAR CAHCE ---
 php artisan cache:clear
 php artisan config:clear
 php artisan route:clear
@@ -8,7 +8,44 @@ php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache
 
----GERAR PPTX---
-composer require phpoffice/phppresentation
+--- BANNERS ---
+$this->banner('SUCESSO');
+$this->warningBanner('ALERTA');
+$this->dangerBanner('ERRO');
+
+API IBGE — Links principais (Regiões, Estados e Municípios)
+Todas as regiões
+
+- Regiões
+-- Todas as regiões
+--- https://servicodados.ibge.gov.br/api/v1/localidades/regioes
+
+-- Estados de uma região (substituir {id} pelo código da região)
+--- https://servicodados.ibge.gov.br/api/v1/localidades/regioes/{id}/estados
+
+-- Municípios de uma região (substituir {id} pelo código da região)
+--- https://servicodados.ibge.gov.br/api/v1/localidades/regioes/{id}/municipios
 
 
+- Estados
+-- Todos os estados
+--- https://servicodados.ibge.gov.br/api/v1/localidades/estados
+
+-- Estado específico (substituir {id} pelo código IBGE do estado, ex: 35 = SP)
+--- https://servicodados.ibge.gov.br/api/v1/localidades/estados/{id}
+
+-- Municípios de um estado (substituir {id} pelo código IBGE do estado)
+--- https://servicodados.ibge.gov.br/api/v1/localidades/estados/{id}/municipios
+
+- Municípios
+--Todos os municípios do Brasil
+--- https://servicodados.ibge.gov.br/api/v1/localidades/municipios
+
+-- Município específico (substituir {id} pelo código IBGE do município, ex: 3550308 = São Paulo capital)
+--- https://servicodados.ibge.gov.br/api/v1/localidades/municipios/{id}
+
+
+- API PARA CEP
+--- https://viacep.com.br/ws/{CEP}/json/
+
+// ACRESCENTAR NO EVENTO (SELECT) COM -  REGIAO - ESTADO - MUNICIPIO - CEP

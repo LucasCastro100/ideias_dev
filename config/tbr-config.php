@@ -2,14 +2,14 @@
 
 return [
     'categories' => [
-        ['id' => 'A1B2C3D4E5F6', 'slug' => 'baby',       'label' => 'Baby',       'modalitie' => 'basic', 'question' => 'basic'],
-        ['id' => 'G7H8I9J0K1L2', 'slug' => 'kids1',      'label' => 'Kids 1',     'modalitie' => 'intermediary', 'question' => 'basic'],
-        ['id' => 'M3N4O5P6Q7R8', 'slug' => 'kids2',      'label' => 'Kids 2',     'modalitie' => 'advanced', 'question' => 'advanced'],
-        ['id' => 'S9T0U1V2W3X4', 'slug' => 'middle1',    'label' => 'Middle 1',   'modalitie' => 'advanced', 'question' => 'advanced'],
-        ['id' => 'Y5Z6A7B8C9D0', 'slug' => 'middle2',    'label' => 'Middle 2',   'modalitie' => 'advanced', 'question' => 'advanced'],
-        ['id' => 'E1F2G3H4I5J6', 'slug' => 'high',       'label' => 'High',       'modalitie' => 'advanced', 'question' => 'advanced'],
-        ['id' => 'K7L8M9N0O1P2', 'slug' => 'technic',    'label' => 'Technic',    'modalitie' => 'advanced', 'question' => 'advanced'],
-        ['id' => 'Q3R4S5T6U7V8', 'slug' => 'university', 'label' => 'University', 'modalitie' => 'advanced', 'question' => 'advanced'],
+        ['id' => 'A1B2C3D4E5F6', 'slug' => 'baby',       'label' => 'Baby',       'modalitie' => 'basic',        'question' => 'basic',    'dp' => 'baby'],
+        ['id' => 'G7H8I9J0K1L2', 'slug' => 'kids1',      'label' => 'Kids 1',     'modalitie' => 'intermediary', 'question' => 'basic',    'dp' => 'kids1'],
+        ['id' => 'M3N4O5P6Q7R8', 'slug' => 'kids2',      'label' => 'Kids 2',     'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'kids2'],
+        ['id' => 'S9T0U1V2W3X4', 'slug' => 'middle1',    'label' => 'Middle 1',   'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'middle'],
+        ['id' => 'Y5Z6A7B8C9D0', 'slug' => 'middle2',    'label' => 'Middle 2',   'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'middle'],
+        ['id' => 'E1F2G3H4I5J6', 'slug' => 'high',       'label' => 'High',       'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'high'],
+        ['id' => 'K7L8M9N0O1P2', 'slug' => 'technic',    'label' => 'Technic',    'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'technic_university'],
+        ['id' => 'Q3R4S5T6U7V8', 'slug' => 'university', 'label' => 'University', 'modalitie' => 'advanced',     'question' => 'advanced', 'dp' => 'technic_university'],
     ],
 
     'modalities_by_level' => [
@@ -218,5 +218,36 @@ return [
                 ]
             ]
         ]
-    ]
+    ],
+
+    'dp_by_level' => [
+        'intermediary' => [
+            ['mission' => 'Missão 1', 'itens' => [
+                ['name' => 'Item 1', 'type' => 'objetivo'],
+                ['name' => 'Item 2', 'type' => 'objetivo'],
+            ]],
+            ['mission' => 'Missão 2', 'itens' => [
+                ['name' => 'Item 1', 'type' => 'objetivo'],
+                ['name' => 'Item 2', 'type' => 'objetivo'],
+            ]],
+        ],
+        'advanced' => [
+            ['mission' => 'Missão 1', 'itens' => [
+                ['name' => 'Item 1', 'type' => 'objetivo'],
+                ['name' => 'Item 2', 'type' => 'objetivo'],
+                ['name' => 'Item 3', 'type' => 'objetivo'],
+            ]],
+            ['mission' => 'Missão 2', 'itens' => [
+                ['name' => 'Item 1', 'type' => 'objetivo'],
+                ['name' => 'Item 2', 'type' => 'objetivo'],
+                ['name' => 'Item 3', 'type' => 'objetivo'],
+                ['name' => 'Item 4', 'type' => 'objetivo'],
+            ]],
+            ['mission' => 'Missão 3', 'itens' => [
+                ['name' => 'Item 1', 'type' => 'objetivo'],
+                ['name' => 'Item 2', 'type' => 'objetivo'],
+                ['name' => 'Item 3', 'type' => 'objetivo'],
+            ]],
+        ],
+    ],
 ];

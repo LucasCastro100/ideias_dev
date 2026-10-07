@@ -2,38 +2,38 @@
 
 namespace App\Livewire\Page;
 
-use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use App\Models\Category;
+use App\Models\Event;
 
 class SlideShow extends Component
 {
     public $slides = [];
     public $currentSlide = 0;
-    public $showSidebar = true;
+    public $showSidebar = false;
+    public $title = 'TBR - Slide Ranking';
 
     public function mount($event_id)
     {
-        $json = Storage::disk('public')->get('tbr/json/data.json');
-        $events = json_decode($json, true);
-        $event = collect($events)->firstWhere('id', $event_id);
+        $event = Event::with('teams.scores')->find($event_id);
 
         if (!$event) {
             abort(404, 'Evento não encontrado');
         }
 
-        $categories = config('tbr-config.categories');
+        $categories = Category::orderBy('sort_order')->get()->map(fn($c) => [
+            'slug' => $c->slug, 'label' => $c->label,
+            'modalitie' => $c->modality_level, 'dp' => $c->dp_level,
+        ])->toArray();
         $modalitiesByLevel = config('tbr-config.modalities_by_level');
-        $rankingConfig = $event['ranking_config'] ?? [];
 
-        $topPositions = (int)($rankingConfig['top_positions'] ?? 0);
-        $generalTopPositions = (int)($rankingConfig['general_top_positions'] ?? 3);
-
+        $topPositions = 3;
+        $generalTopPositions = 3;
         $slides = [];
 
-        // ➕ Slide inicial com nome do evento
         $slides[] = [
             'type' => 'intro',
-            'title' => $event['nome'] ?? 'Evento',
+            'title' => $event->name ?? 'Evento',
         ];
 
         foreach ($categories as $category) {
@@ -42,19 +42,18 @@ class SlideShow extends Component
             $modalitieLevel = $category['modalitie'];
             $modalities = $modalitiesByLevel[$modalitieLevel] ?? [];
 
-            $teamsCategory = collect($event['equipes'] ?? [])
-                ->filter(fn($t) => ($t['category'] ?? '') === $catSlug)
+            $teamsCategory = $event->teams
+                ->filter(fn($t) => ($t->category_slug ?? '') === $catSlug)
                 ->values();
 
             if ($teamsCategory->isEmpty()) continue;
 
+            $teamsSortedTotal = $teamsCategory->sortByDesc(fn($t) => (float) $t->total_score)->values();
+            $generalTopCount = min($generalTopPositions, $teamsSortedTotal->count());
+
             if ($catSlug === 'baby') {
-                $teamsSortedTotal = $teamsCategory->sortByDesc(fn($t) => floatval($t['nota_total'] ?? 0))->values();
-                $count = min($generalTopPositions, $teamsSortedTotal->count());
-
-                for ($pos = 0; $pos < $count; $pos++) {
-                    $posNumber = $count - $pos;
-
+                for ($i = $generalTopCount - 1; $i >= 0; $i--) {
+                    $posNumber = $i + 1;
                     $slides[] = [
                         'type' => 'award',
                         'categoryLabel' => $catLabel,
@@ -67,24 +66,56 @@ class SlideShow extends Component
                         'categoryLabel' => $catLabel,
                         'modalidadeLabel' => 'Nota Geral',
                         'posNumber' => $posNumber,
-                        'teamName' => $teamsSortedTotal[$pos]['name'],
+                        'teamName' => $teamsSortedTotal[$i]['name'],
                     ];
                 }
-
                 continue;
             }
 
-            if ($topPositions > 0) {
-                foreach ($modalities as $mod) {
+            $totalTeamCount = $teamsCategory->count();
+
+            $generalPodiumIds = $teamsSortedTotal->take($generalTopPositions)->pluck('id')->toArray();
+
+            $modalitiesToAward = [];
+            $isInterno = ($event->tipo_evento ?? 'interno') === 'interno';
+            if (!$isInterno) {
+                if ($totalTeamCount >= 10) {
+                    $modalitiesToAward = $modalities;
+                } elseif ($totalTeamCount === 9) {
+                    $modalitiesToAward = collect($modalities)->filter(fn($m) => in_array($m['slug'], ['mc', 'om']))->values()->toArray();
+                } elseif ($totalTeamCount === 8) {
+                    $modalitiesToAward = collect($modalities)->filter(fn($m) => $m['slug'] === 'mc')->values()->toArray();
+                }
+            }
+
+            if ($topPositions > 0 && !empty($modalitiesToAward)) {
+                foreach ($modalitiesToAward as $mod) {
                     $modSlug = $mod['slug'];
                     $modLabel = $mod['label'];
+                    $teamsSorted = $teamsCategory->sortByDesc(function ($t) use ($modSlug) {
+                        $scores = $t->scores->where('modality_slug', $modSlug);
+                        if ($modSlug === 'dp') {
+                            return (float) $scores->max('total');
+                        }
+                        $first = $scores->first();
+                        return $first ? (float) $first->total : 0;
+                    })->values();
 
-                    $teamsSorted = $teamsCategory->sortByDesc(fn($t) => $t['modalities'][$modSlug]['total'] ?? 0)->values();
-                    $count = min($topPositions, $teamsSorted->count());
+                    $teamsAfterExclusion = $modSlug !== 'dp'
+                        ? $teamsSorted->reject(fn($t) => in_array($t->id, $generalPodiumIds))->values()
+                        : $teamsSorted;
 
-                    for ($pos = 0; $pos < $count; $pos++) {
-                        $posNumber = $count - $pos;
+                    $remainingCount = $teamsAfterExclusion->count();
+                    if ($remainingCount <= 1) continue;
 
+                    $dynamicTop = $remainingCount <= 3
+                        ? 1
+                        : ($remainingCount === 4 ? 2 : min($topPositions, 3));
+
+                    $modalityTop = $teamsAfterExclusion->take($dynamicTop)->values();
+                    $modalityCount = $modalityTop->count();
+                    for ($i = $modalityCount - 1; $i >= 0; $i--) {
+                        $posNumber = $i + 1;
                         $slides[] = [
                             'type' => 'award',
                             'categoryLabel' => $catLabel,
@@ -97,19 +128,15 @@ class SlideShow extends Component
                             'categoryLabel' => $catLabel,
                             'modalidadeLabel' => $modLabel,
                             'posNumber' => $posNumber,
-                            'teamName' => $teamsSorted[$pos]['name'],
+                            'teamName' => $modalityTop[$i]['name'],
                         ];
                     }
                 }
             }
 
-            if ($generalTopPositions > 0 && $catSlug !== 'baby') {
-                $teamsSortedTotal = $teamsCategory->sortByDesc(fn($t) => floatval($t['nota_total'] ?? 0))->values();
-                $countTotal = min($generalTopPositions, $teamsSortedTotal->count());
-
-                for ($pos = 0; $pos < $countTotal; $pos++) {
-                    $posNumber = $countTotal - $pos;
-
+            if ($generalTopPositions > 0) {
+                for ($i = $generalTopCount - 1; $i >= 0; $i--) {
+                    $posNumber = $i + 1;
                     $slides[] = [
                         'type' => 'award',
                         'categoryLabel' => $catLabel,
@@ -122,34 +149,39 @@ class SlideShow extends Component
                         'categoryLabel' => $catLabel,
                         'modalidadeLabel' => 'Nota Geral',
                         'posNumber' => $posNumber,
-                        'teamName' => $teamsSortedTotal[$pos]['name'],
+                        'teamName' => $teamsSortedTotal[$i]['name'],
                     ];
                 }
             }
         }
 
-        // ➕ Slide final de agradecimento
         $slides[] = [
             'type' => 'thankyou',
             'message' => 'Muito obrigado pela participação!',
         ];
 
         $this->slides = $slides;
-        $this->showSidebar = false;
     }
 
     public function next()
     {
-        $this->currentSlide = ($this->currentSlide + 1) % count($this->slides);
+        if ($this->currentSlide < count($this->slides) - 1) {
+            $this->currentSlide++;
+        }
     }
 
     public function prev()
     {
-        $this->currentSlide = ($this->currentSlide - 1 + count($this->slides)) % count($this->slides);
+        if ($this->currentSlide > 0) {
+            $this->currentSlide--;
+        }
     }
 
     public function render()
     {
-        return view('livewire.page.slide-show')->layout('layouts.app-sidebar', ['showSidebar' => $this->showSidebar]);
+        return view('livewire.page.slide-show')
+        ->layout('layouts.app-tbr-public', [
+            'title' => $this->title
+        ]);
     }
 }

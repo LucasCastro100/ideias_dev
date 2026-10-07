@@ -1,5 +1,5 @@
-@if (Route::has('login'))
-    @include('navigation-menu-web')
-@else
+@if (auth()->check())
     @include('navigation-menu-dashboard')
+@else
+    @include('navigation-menu-web')
 @endif

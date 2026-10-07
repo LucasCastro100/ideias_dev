@@ -3,51 +3,112 @@
 namespace App\Livewire\Page;
 
 use Livewire\Component;
-use Illuminate\Support\Facades\Storage;
-use Laravel\Jetstream\InteractsWithBanner;
+use Livewire\Attributes\On;
 use Illuminate\Support\Str;
+use App\Models\Category;
+use App\Models\Event;
+use App\Models\Team;
+use App\Models\User;
+use App\Services\IbgeService;
 
 class Sidebar extends Component
 {
-    use InteractsWithBanner;
-
-    // --- Flags para modais ---
     public bool $showEventModal = false;
     public bool $showTeamModal = false;
     public bool $confirmClearStorage = false;
 
-    // --- Dados para cadastro de evento ---
     public $eventName = '';
     public $eventDate = '';
+    public $tipoEvento = 'interno';
 
-    // Config ranking para o evento novo
-    public $rankingConfig = [
-        'modalities_to_show' => [],       // array das modalidades selecionadas
-        'top_positions' => 3,              // posições mostradas por modalidade (0 a 3)
-        'general_top_positions' => 3,      // posições mostradas no ranking geral (0 a 5)
-    ];
-
-    // --- Dados para cadastro de equipes ---
-    public $selectedEventIndex = null;
+    public $selectedEventId = null;
     public $numTeams = 1;
     public $teams = [
         [
             'name' => '',
             'category' => 'baby',
-            'mc' => 0,
-            'om' => 0,
-            'te' => 0,
-            'dp' => 0,
+            'representative_user_id' => '',
+            'representative_name' => '',
+            'representative_email' => '',
+            'representative_phone' => '',
         ],
     ];
 
-    // --- Dados carregados dos eventos ---
     public $events = [];
+    public $allUsers = [];
 
-    // ----------- Métodos -----------
+    public $selectedRegion = null;
+    public $selectedRegionId = null;
+    public $selectedState = null;
+    public $selectedStateId = null;
+    public $selectedCity = null;
+    public $selectedCityId = null;
 
+    public $regions = [];
+    public $filteredStates = [];
+    public $filteredCities = [];
+
+    protected IbgeService $ibge;
+
+    public function boot(IbgeService $ibge)
+    {
+        $this->ibge = $ibge;
+    }
+
+    public function mount()
+    {
+        $this->regions = $this->ibge->getRegions();
+        $this->filteredStates = [];
+        $this->filteredCities = [];
+        $this->resetLocation();
+    }
+
+    private function resetLocation()
+    {
+        $this->selectedRegion = null;
+        $this->selectedRegionId = null;
+        $this->selectedState = null;
+        $this->selectedStateId = null;
+        $this->selectedCity = null;
+        $this->selectedCityId = null;
+        $this->filteredStates = [];
+        $this->filteredCities = [];
+    }
+
+    public function updatedSelectedRegion($value)
+    {
+        $region = collect($this->regions)->firstWhere('nome', $value);
+        $this->selectedRegionId = $region['id'] ?? null;
+        $this->selectedState = null;
+        $this->selectedStateId = null;
+        $this->selectedCity = null;
+        $this->selectedCityId = null;
+        $this->filteredStates = $this->selectedRegionId
+            ? $this->ibge->getStatesByRegion($this->selectedRegionId)
+            : [];
+    }
+
+    public function updatedSelectedState($value)
+    {
+        $state = collect($this->filteredStates)->firstWhere('nome', $value);
+        $this->selectedStateId = $state['id'] ?? null;
+        $this->selectedCity = null;
+        $this->selectedCityId = null;
+        $this->filteredCities = $this->selectedStateId
+            ? $this->ibge->getCitiesByState($this->selectedStateId)
+            : [];
+    }
+
+    public function updatedSelectedCity($value)
+    {
+        $city = collect($this->filteredCities)->firstWhere('nome', $value);
+        $this->selectedCityId = $city['id'] ?? null;
+    }
+
+    #[On('openEventModal')]
     public function openEventModal()
     {
+        $this->authorize('create');
         $this->loadEvents();
         $this->showEventModal = true;
     }
@@ -62,78 +123,94 @@ class Sidebar extends Component
     {
         $this->eventName = '';
         $this->eventDate = '';
-        $this->rankingConfig = [
-            'modalities_to_show' => [],
-            'top_positions' => 3,
-            'general_top_positions' => 3,
-        ];
+        $this->tipoEvento = 'interno';
+        $this->selectedRegion = null;
+        $this->selectedState = null;
+        $this->selectedCity = null;
+        $this->filteredStates = [];
+        $this->filteredCities = [];
         $this->resetErrorBag('eventName');
         $this->resetErrorBag('eventDate');
-        $this->resetErrorBag('rankingConfig');
+        $this->resetErrorBag('selectedRegion');
+        $this->resetErrorBag('selectedState');
+        $this->resetErrorBag('selectedCity');
     }
 
     public function saveEvent()
     {
+        $this->authorize('create');
         $this->validate([
             'eventName' => 'required|string|min:2',
             'eventDate' => 'required|date',
-            'rankingConfig.top_positions' => 'nullable|integer|min:0|max:3',
-            'rankingConfig.general_top_positions' => 'nullable|integer|min:0|max:5',
-            'rankingConfig.modalities_to_show' => 'nullable|array',            
-            'rankingConfig.modalities_to_show.*' => 'in:ap,mc,om,te,dp',
         ], [
-            'rankingConfig.top_positions.integer' => 'O número de posições por modalidade deve ser um número inteiro.',
-            'rankingConfig.top_positions.min' => 'O número de posições por modalidade não pode ser negativo.',
-            'rankingConfig.top_positions.max' => 'O número de posições por modalidade não pode ser maior que 3.',
-            'rankingConfig.general_top_positions.integer' => 'O número de posições no ranking geral deve ser um número inteiro.',
-            'rankingConfig.general_top_positions.min' => 'O número de posições no ranking geral não pode ser negativo.',
-            'rankingConfig.general_top_positions.max' => 'O número de posições no ranking geral não pode ser maior que 5.',
-            'rankingConfig.modalities_to_show.*.in' => 'Modalidade inválida selecionada.',
+            'eventName.required' => 'O nome do evento é obrigatório.',
+            'eventName.min' => 'O nome deve ter pelo menos 2 caracteres.',
+            'eventDate.required' => 'A data do evento é obrigatória.',
+            'eventDate.date' => 'Informe uma data válida.',
         ]);
 
-        $newEvent = [
-            'id' => Str::upper(Str::random(12)),
-            'nome' => $this->eventName,
-            'data' => $this->eventDate,
-            'ranking_config' => [
-                'modalities_to_show' => is_array($this->rankingConfig['modalities_to_show'])
-                    ? $this->rankingConfig['modalities_to_show']
-                    : [],
-                'top_positions' => max(0, (int)($this->rankingConfig['top_positions'] ?? 0)),
-                'general_top_positions' => max(0, (int)($this->rankingConfig['general_top_positions'] ?? 0)),
-            ],
-            'equipes' => [],
-        ];
+        $exists = Event::where('name', $this->eventName)
+            ->where('date', $this->eventDate)
+            ->exists();
 
-        $this->loadEvents();
-
-        foreach ($this->events as $event) {
-            if (
-                strtolower($event['nome']) === strtolower($newEvent['nome']) &&
-                $event['data'] === $newEvent['data']
-            ) {
-                $this->addError('eventName', 'Evento já cadastrado com este nome e data.');
-                return;
-            }
-        }
-
-        $this->events[] = $newEvent;
-        $this->saveEventsToStorage();
-
-        $this->banner('Evento cadastrado com sucesso!');
-        $this->dispatch('eventCreated');
-        $this->closeEventModal();
-    }
-
-
-    public function openTeamModal()
-    {
-        $this->loadEvents();
-        if (empty($this->events)) {
-            $this->warningBanner('Você precisa cadastrar pelo menos um evento antes de adicionar equipes.');
+        if ($exists) {
+            $this->addError('eventName', 'Evento já cadastrado com este nome e data.');
             return;
         }
 
+        Event::create([
+            'id' => Str::upper(Str::random(12)),
+            'name' => $this->eventName,
+            'date' => $this->eventDate,
+            'status' => false,
+            'tipo_evento' => $this->tipoEvento,
+            'location' => [
+                'regiao' => $this->selectedRegion
+                    ? [
+                        'id' => $this->selectedRegionId,
+                        'sigla' => collect($this->regions)->firstWhere('id', $this->selectedRegionId)['sigla'] ?? null,
+                        'nome' => $this->selectedRegion,
+                    ]
+                    : null,
+                'estado' => $this->selectedState
+                    ? [
+                        'id' => $this->selectedStateId,
+                        'sigla' => collect($this->filteredStates)->firstWhere('id', $this->selectedStateId)['sigla'] ?? null,
+                        'nome' => $this->selectedState,
+                    ]
+                    : null,
+                'municipio' => $this->selectedCity
+                    ? [
+                        'id' => $this->selectedCityId,
+                        'nome' => $this->selectedCity,
+                    ]
+                    : null,
+            ],
+        ]);
+
+        $this->dispatch('eventCreated');
+        $this->closeEventModal();
+
+        $this->dispatch('toast-message', message: 'Evento cadastrado com sucesso!', style: 'success');
+    }
+
+    #[On('openTeamModal')]
+    public function openTeamModal()
+    {
+        $this->authorize('create');
+        $rawEvents = Event::where('status', false)->orderBy('date', 'desc')->get();
+        $this->events = $rawEvents->map(fn($e) => [
+            'id' => $e->id,
+            'name' => $e->name,
+            'date' => $e->date,
+            'date_formatted' => \Carbon\Carbon::parse($e->date)->format('d/m/y'),
+            'display' => $e->name . ' (' . \Carbon\Carbon::parse($e->date)->format('d/m/y') . ')',
+        ])->toArray();
+        $this->allUsers = User::where('id', '!=', 1)->orderBy('name')->get(['id', 'name', 'email']);
+        if (empty($this->events)) {
+            $this->dispatch('toast-message', message: 'Você precisa cadastrar pelo menos um evento antes de adicionar equipes.', style: 'warning');
+            return;
+        }
         $this->showTeamModal = true;
     }
 
@@ -146,21 +223,19 @@ class Sidebar extends Component
     public function resetTeamForm()
     {
         $this->numTeams = 1;
-        $defaultCategorySlug = config('tbr-config.categories')[0]['slug'] ?? 'baby';
-
+        $defaultCategorySlug = Category::orderBy('sort_order')->value('slug') ?? 'baby';
         $this->teams = [
             [
                 'name' => '',
                 'category' => $defaultCategorySlug,
-                'mc' => 0,
-                'om' => 0,
-                'te' => 0,
-                'dp' => 0,
+                'representative_name' => '',
+                'representative_email' => '',
+                'representative_phone' => '',
             ],
         ];
-        $this->selectedEventIndex = null;
+        $this->selectedEventId = null;
         $this->resetErrorBag('teams');
-        $this->resetErrorBag('selectedEventIndex');
+        $this->resetErrorBag('selectedEventId');
     }
 
     public function updatedNumTeams($value)
@@ -169,17 +244,17 @@ class Sidebar extends Component
         if ($value < 1) $value = 1;
 
         $count = count($this->teams);
-        $defaultCategorySlug = config('tbr-config.categories')[0]['slug'] ?? 'baby';
+        $defaultCategorySlug = Category::orderBy('sort_order')->value('slug') ?? 'baby';
 
         if ($value > $count) {
             for ($i = $count; $i < $value; $i++) {
                 $this->teams[] = [
                     'name' => '',
                     'category' => $defaultCategorySlug,
-                    'mc' => 0,
-                    'om' => 0,
-                    'te' => 0,
-                    'dp' => 0,
+                    'representative_user_id' => '',
+                    'representative_name' => '',
+                    'representative_email' => '',
+                    'representative_phone' => '',
                 ];
             }
         } elseif ($value < $count) {
@@ -187,83 +262,88 @@ class Sidebar extends Component
         }
     }
 
+    public function fillTeamRepresentative(int $index, string $userId): void
+    {
+        if (!$userId || !isset($this->teams[$index])) return;
+
+        $user = User::find($userId);
+        if ($user) {
+            $this->teams[$index]['representative_name'] = $user->name;
+            $this->teams[$index]['representative_email'] = $user->email;
+        }
+    }
+
     public function saveTeams()
     {
-        $categories = config('tbr-config.categories') ?? [];
+        $this->authorize('create');
+        $categories = Category::orderBy('sort_order')->get();
         $modalitiesByLevel = config('tbr-config.modalities_by_level') ?? [];
 
-        $categorySlugs = collect($categories)->pluck('slug')->toArray();
-        $categoryLevels = collect($categories)->mapWithKeys(fn($cat) => [$cat['slug'] => $cat['modalitie'] ?? 'basic'])->toArray();
+        $categorySlugs = $categories->pluck('slug')->toArray();
+        $categoryLevels = $categories->mapWithKeys(fn($cat) => [$cat['slug'] => $cat['modality_level'] ?? 'basic'])->toArray();
 
         $this->validate([
-            'selectedEventIndex' => 'required|integer|min:0',
+            'selectedEventId' => 'required',
             'teams.*.name' => 'required|min:2',
             'teams.*.category' => 'required|in:' . implode(',', $categorySlugs),
         ], [
-            'selectedEventIndex.required' => 'Você deve selecionar um evento.',
+            'selectedEventId.required' => 'Selecione um evento.',
+            'teams.*.name.required' => 'O nome da equipe é obrigatório.',
+            'teams.*.name.min' => 'O nome da equipe deve ter pelo menos 2 caracteres.',
+            'teams.*.category.required' => 'Selecione uma categoria.',
         ]);
 
-        $this->loadEvents();
-
-        if (!isset($this->events[$this->selectedEventIndex])) {
-            $this->addError('selectedEventIndex', 'Evento selecionado inválido.');
+        $event = Event::find($this->selectedEventId);
+        if (!$event) {
+            $this->addError('selectedEventId', 'Evento selecionado inválido.');
             return;
         }
 
-        $evento = &$this->events[$this->selectedEventIndex];
+        foreach ($this->teams as $teamData) {
+            $teamNameLower = strtolower($teamData['name']);
 
-        foreach ($this->teams as $team) {
-            $teamNameLower = strtolower($team['name']);
-
-            $exists = collect($evento['equipes'])->contains(
-                fn($existingTeam) =>
-                strtolower($existingTeam['name']) === $teamNameLower
-            );
+            $exists = $event->teams()->whereRaw('LOWER(name) = ?', [$teamNameLower])->exists();
 
             if (!$exists) {
-                $categorySlug = $team['category'];
-                $modalitie_level = $categoryLevels[$categorySlug] ?? 'basic';
-                $modalities = [];
+                $categorySlug = $teamData['category'];
+                $modalitieLevel = $categoryLevels[$categorySlug] ?? 'basic';
 
-                foreach ($modalitiesByLevel[$modalitie_level] ?? [] as $modality) {
+                $team = $event->teams()->create([
+                    'id' => Str::upper(Str::random(12)),
+                    'name' => $teamData['name'],
+                    'category_slug' => $categorySlug,
+                    'total_score' => 0,
+                    'representative_name' => $teamData['representative_name'] ?? null,
+                    'representative_email' => $teamData['representative_email'] ?? null,
+                    'representative_phone' => $teamData['representative_phone'] ?? null,
+                ]);
+
+                foreach ($modalitiesByLevel[$modalitieLevel] ?? [] as $modality) {
                     $slug = is_array($modality) ? ($modality['slug'] ?? null) : $modality;
-
-                    if (!$slug || !is_string($slug)) {
-                        continue;
-                    }
+                    if (!$slug || !is_string($slug)) continue;
 
                     if ($slug === 'dp') {
-                        $modalities[$slug] = [
-                            'nota' => [
-                                'r1' => [],
-                                'r2' => [],
-                                'r3' => [],
-                            ],
-                            'total' => 0,
-                            'comentario' => '',
-                        ];
+                        $team->scores()->createMany([
+                            ['modality_slug' => 'dp', 'round' => 'r1', 'scores' => [], 'total' => 0, 'comment' => ''],
+                            ['modality_slug' => 'dp', 'round' => 'r2', 'scores' => [], 'total' => 0, 'comment' => ''],
+                            ['modality_slug' => 'dp', 'round' => 'r3', 'scores' => [], 'total' => 0, 'comment' => ''],
+                        ]);
                     } else {
-                        $modalities[$slug] = [
-                            'nota' => [],
+                        $team->scores()->create([
+                            'modality_slug' => $slug,
+                            'round' => null,
+                            'scores' => [],
                             'total' => 0,
-                            'comentario' => '',
-                        ];
+                            'comment' => '',
+                        ]);
                     }
                 }
-
-                $evento['equipes'][] = [
-                    'id' => Str::upper(Str::random(12)),
-                    'name' => $team['name'],
-                    'category' => $categorySlug,
-                    'modalities' => $modalities,
-                    'nota_total' => 0,
-                ];
             }
         }
 
-        $this->saveEventsToStorage();
-        $this->banner('Equipes cadastradas com sucesso!');
+        $this->dispatch('toast-message', message: 'Equipes cadastradas com sucesso!', style: 'success');
         $this->closeTeamModal();
+        $this->dispatch('teams-updated');
     }
 
     public function askToClearStorage()
@@ -278,41 +358,25 @@ class Sidebar extends Component
 
     public function confirmAndClearStorage()
     {
+        $this->authorize('delete');
         $this->clearStorage();
         $this->confirmClearStorage = false;
     }
 
     public function loadEvents()
     {
-        $jsonPath = 'tbr/json/data.json';
-
-        if (Storage::disk('public')->exists($jsonPath)) {
-            $this->events = json_decode(Storage::disk('public')->get($jsonPath), true);
-        } else {
-            $this->events = [];
-        }
-
+        $this->events = Event::orderBy('date', 'desc')->get()->toArray();
         return $this->events;
-    }
-
-    public function saveEventsToStorage()
-    {
-        $jsonPath = 'tbr/json/data.json';
-
-        Storage::disk('public')->put($jsonPath, json_encode($this->events, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     public function clearStorage()
     {
-        $jsonPath = 'tbr/json/data.json';
-
-        Storage::disk('public')->put($jsonPath, json_encode([]));
+        Event::query()->delete();
 
         $this->resetEventForm();
         $this->resetTeamForm();
 
-        $this->banner('Dados do JSON apagados e formulários resetados!');
-
+        $this->dispatch('toast-message', message: 'Dados apagados e formulários resetados!', style: 'success');
         $this->dispatch('eventCreated');
     }
 
@@ -320,7 +384,7 @@ class Sidebar extends Component
     {
         return view('livewire.page.sidebar', [
             'events' => $this->events,
-            'categories' => config('tbr-config.categories') ?? [],
+            'categories' => Category::orderBy('sort_order')->get()->toArray(),
         ]);
     }
 }

@@ -2,47 +2,35 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Laravel\Jetstream\Events\TeamCreated;
-use Laravel\Jetstream\Events\TeamDeleted;
-use Laravel\Jetstream\Events\TeamUpdated;
-use Laravel\Jetstream\Team as JetstreamTeam;
+use Illuminate\Database\Eloquent\Model;
 
-class Team extends JetstreamTeam
+class Team extends Model
 {
-    /** @use HasFactory<\Database\Factories\TeamFactory> */
-    use HasFactory;
+    protected $table = 'tbr_teams';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
     protected $fillable = [
-        'name',
-        'personal_team',
+        'id', 'event_id', 'name', 'category_slug', 'total_score',
+        'representative_name', 'representative_email', 'representative_phone',
     ];
 
-    /**
-     * The event map for the model.
-     *
-     * @var array<string, class-string>
-     */
-    protected $dispatchesEvents = [
-        'created' => TeamCreated::class,
-        'updated' => TeamUpdated::class,
-        'deleted' => TeamDeleted::class,
-    ];
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'personal_team' => 'boolean',
+            'total_score' => 'decimal:2',
         ];
+    }
+
+    public function event()
+    {
+        return $this->belongsTo(Event::class);
+    }
+
+    public function scores()
+    {
+        return $this->hasMany(TeamModalityScore::class);
     }
 }
